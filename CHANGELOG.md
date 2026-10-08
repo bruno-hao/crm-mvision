@@ -9,6 +9,19 @@ Versions follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0, `MINOR` bumps cover new modules; `PATCH` bumps cover bug fixes
 and polish.
 
+## [Unreleased]
+
+### Added
+- **OpenRouter** as an AI assistant provider (Settings → AI). Paste an
+  OpenRouter key (`sk-or-...`) and click **Test key**: the key is
+  confirmed with OpenRouter and its model catalogue fills the model
+  dropdown (with a filter box for the long list). OpenAI and Anthropic
+  keys now load their model lists into the same dropdown too.
+
+> **Migration required:** apply `supabase/migrations/047_ai_openrouter.sql`
+> (adds `openrouter` to the `provider` CHECK on `ai_configs` and
+> `ai_usage_log`).
+
 ## [0.8.1] — 2026-07-10
 
 Fixes inbound chats fragmenting into multiple threads for the same

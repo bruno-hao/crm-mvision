@@ -1974,7 +1974,14 @@
       "providerOpenAiCompatible": "API compatível com OpenAI",
       "baseUrl": "URL base",
       "baseUrlHint": "URL base da API compatível com OpenAI, por exemplo https://api.groq.com/openai/v1. O caminho /chat/completions é adicionado automaticamente, a menos que você informe esse caminho.",
-      "missingBaseUrl": "Informe a URL base da API compatível com OpenAI."
+      "missingBaseUrl": "Informe a URL base da API compatível com OpenAI.",
+      "modelsLoaded": "Chave confirmada — {count} modelos disponíveis.",
+      "modelsFailed": "Não foi possível carregar a lista de modelos.",
+      "modelSelectPlaceholder": "Selecione um modelo",
+      "modelSearchPlaceholder": "Filtrar modelos…",
+      "modelsNoMatch": "Nenhum modelo corresponde ao filtro.",
+      "modelsHint": "Clique em \"Testar chave\" para confirmar a chave e carregar os modelos disponíveis.",
+      "openRouterHint": "Use uma chave do OpenRouter (sk-or-...). Gere uma em openrouter.ai/keys."
     },
     "aiKnowledge": {
       "loadFailed": "Falha ao carregar a base de conhecimento",
@@ -2580,7 +2587,9 @@
       "pausedRequired": "paused (booleano) é obrigatório",
       "updateConversationFailed": "Falha ao atualizar a conversa",
       "loadConfigFailed": "Falha ao carregar a configuração de IA",
-      "providerInvalid": "O provedor deve ser \"openai\", \"anthropic\" ou \"openai_compatible\"",
+      "providerInvalid": "O provedor deve ser \"openai\", \"anthropic\", \"openrouter\" ou \"openai_compatible\"",
+      "modelsUnsupported": "A listagem de modelos não está disponível para APIs compatíveis com OpenAI — digite o id do modelo.",
+      "modelsFailed": "Não foi possível carregar a lista de modelos do provedor.",
       "baseUrlRequired": "base_url é obrigatório para openai_compatible",
       "baseUrlInvalid": "base_url deve ser uma URL http(s) válida",
       "modelRequired": "O modelo é obrigatório",

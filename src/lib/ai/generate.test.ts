@@ -308,3 +308,47 @@ describe('generateReply — OpenAI-compatible', () => {
     expect(fetchMock.mock.calls[0][1].redirect).toBe('manual')
   })
 })
+
+describe('generateReply — OpenRouter', () => {
+  it('calls the OpenRouter chat completions endpoint with the slug model', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      okResponse({
+        choices: [{ message: { content: 'Olá!' } }],
+        usage: { prompt_tokens: 12, completion_tokens: 3, total_tokens: 15 },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await generateReply({
+      config: config({ provider: 'openrouter', model: 'anthropic/claude-haiku-4.5', apiKey: 'sk-or-test' }),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Oi' }],
+    })
+
+    expect(res).toEqual({
+      text: 'Olá!',
+      handoff: false,
+      usage: { promptTokens: 12, completionTokens: 3, totalTokens: 15 },
+    })
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://openrouter.ai/api/v1/chat/completions')
+    expect(opts.headers.Authorization).toBe('Bearer sk-or-test')
+    const body = JSON.parse(opts.body)
+    expect(body.model).toBe('anthropic/claude-haiku-4.5')
+    expect(body.messages[0]).toEqual({ role: 'system', content: 'sys' })
+  })
+
+  it('maps a 401 to an invalid_key AiError', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(errResponse(401, { error: { message: 'No auth credentials found' } })),
+    )
+    await expect(
+      generateReply({
+        config: config({ provider: 'openrouter' }),
+        systemPrompt: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_key', status: 401 })
+  })
+})

@@ -27,7 +27,7 @@ import {
 import { SettingsPanelHead } from './settings-panel-head';
 import { AiKnowledgeCard } from './ai-knowledge';
 import { AI_PROVIDER_DEFAULT_MODEL } from '@/lib/ai/defaults';
-import type { AiProvider } from '@/lib/ai/types';
+import type { AiModelOption, AiProvider } from '@/lib/ai/types';
 import type { AccountMember } from '@/types';
 import { fetchAccountMembers, memberLabel } from '@/lib/account/members';
 import { useTranslations } from 'next-intl';
@@ -41,13 +41,23 @@ const HANDOFF_QUEUE = '__queue__';
 const PROVIDER_LABEL: Record<Exclude<AiProvider, 'openai_compatible'>, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic (Claude)',
+  openrouter: 'OpenRouter',
 };
 
 const KEY_PLACEHOLDER: Record<AiProvider, string> = {
   openai: 'sk-...',
   anthropic: 'sk-ant-...',
+  openrouter: 'sk-or-...',
   openai_compatible: 'your-api-key',
 };
+
+// Providers whose key can list its models (POST /api/ai/models). The
+// OpenAI-compatible option has no catalogue, so its model stays free text.
+const canListModels = (p: AiProvider) => p !== 'openai_compatible';
+
+// Above this many models a filter box is shown over the dropdown —
+// OpenRouter alone returns several hundred.
+const MODEL_FILTER_THRESHOLD = 15;
 
 export function AiConfig() {
   const { accountId, accountRole, profileLoading } = useAuth();
@@ -77,12 +87,53 @@ export function AiConfig() {
   // Empty string = leave unassigned (shared queue).
   const [handoffAgentId, setHandoffAgentId] = useState('');
   const [members, setMembers] = useState<AccountMember[]>([]);
+  // Model catalogue for the dropdown, tagged with the provider it was
+  // fetched for so a provider switch never shows another provider's list.
+  const [models, setModels] = useState<AiModelOption[]>([]);
+  const [modelsProvider, setModelsProvider] = useState<AiProvider | null>(null);
+  const [modelFilter, setModelFilter] = useState('');
 
   // Guard keyed on the account (not a bare boolean) so an in-place
   // account switch — ownership transfer, multi-account membership —
   // refetches instead of showing the previous account's config. Mirrors
   // the loadedAccountIdRef pattern in whatsapp-config.tsx.
   const loadedAccountIdRef = useRef<string | null>(null);
+
+  /**
+   * Confirm the key with the provider and load its models into the
+   * dropdown. `apiKeyOverride` undefined = use the stored key. Returns
+   * whether the key was accepted.
+   */
+  const loadModels = useCallback(
+    async (
+      forProvider: AiProvider,
+      apiKeyOverride: string | undefined,
+      opts: { silent?: boolean } = {},
+    ): Promise<boolean> => {
+      try {
+        const res = await fetch('/api/ai/models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: forProvider, api_key: apiKeyOverride }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          if (!opts.silent) toast.error(data.error ?? t('modelsFailed'));
+          return false;
+        }
+        const list: AiModelOption[] = Array.isArray(data.models) ? data.models : [];
+        setModels(list);
+        setModelsProvider(forProvider);
+        setModelFilter('');
+        if (!opts.silent) toast.success(t('modelsLoaded', { count: list.length }));
+        return true;
+      } catch {
+        if (!opts.silent) toast.error(t('modelsFailed'));
+        return false;
+      }
+    },
+    [t],
+  );
 
   const fetchConfig = useCallback(async () => {
     setLoading(true);
@@ -109,13 +160,18 @@ export function AiConfig() {
         setHasStoredEmbeddingsKey(Boolean(data.has_embeddings_key));
         setEmbeddingsKey(data.has_embeddings_key ? MASKED_KEY : '');
         setEmbeddingsKeyEdited(false);
+        // Pre-fill the dropdown from the stored key; quiet on failure —
+        // the field falls back to free text.
+        if (data.has_key && canListModels(data.provider)) {
+          void loadModels(data.provider, undefined, { silent: true });
+        }
       }
     } catch {
       toast.error(t('loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadModels]);
 
   useEffect(() => {
     if (!accountId || loadedAccountIdRef.current === accountId) return;
@@ -131,10 +187,14 @@ export function AiConfig() {
   // typed a custom model.
   const handleProviderChange = (next: AiProvider) => {
     setProvider(next);
+    setModels([]);
+    setModelsProvider(null);
+    setModelFilter('');
+    // Also swap a model picked from the previous provider's dropdown —
+    // e.g. an OpenAI id means nothing to OpenRouter.
     const isDefaultModel =
-      model === AI_PROVIDER_DEFAULT_MODEL.openai ||
-      model === AI_PROVIDER_DEFAULT_MODEL.anthropic ||
-      model === AI_PROVIDER_DEFAULT_MODEL.openai_compatible ||
+      Object.values(AI_PROVIDER_DEFAULT_MODEL).includes(model) ||
+      models.some((m) => m.id === model) ||
       model.trim() === '';
     if (isDefaultModel) setModel(next === 'openai_compatible' ? '' : AI_PROVIDER_DEFAULT_MODEL[next]);
   };
@@ -161,6 +221,12 @@ export function AiConfig() {
   const handleTest = async () => {
     setTesting(true);
     try {
+      // First confirm the key and fill the model dropdown. With no model
+      // picked yet that's the whole test — the user chooses one next.
+      if (canListModels(provider)) {
+        const ok = await loadModels(provider, keyPayload());
+        if (!ok || !model.trim()) return;
+      }
       const res = await fetch('/api/ai/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -252,6 +318,24 @@ export function AiConfig() {
 
   const disabled = !canEdit || saving;
 
+  // Dropdown options, or null to fall back to the free-text model input.
+  // A saved model missing from the catalogue (renamed/retired) is kept as
+  // an option so the current value never silently disappears.
+  const modelOptions: AiModelOption[] | null =
+    modelsProvider === provider && models.length > 0
+      ? model && !models.some((m) => m.id === model)
+        ? [{ id: model, name: model }, ...models]
+        : models
+      : null;
+  const filterText = modelFilter.trim().toLowerCase();
+  const visibleModels = (modelOptions ?? []).filter(
+    (m) =>
+      !filterText ||
+      m.id === model ||
+      m.id.toLowerCase().includes(filterText) ||
+      m.name.toLowerCase().includes(filterText),
+  );
+
   return (
     <div>
       <SettingsPanelHead
@@ -292,6 +376,9 @@ export function AiConfig() {
                     <SelectItem value="anthropic">
                       {PROVIDER_LABEL.anthropic}
                     </SelectItem>
+                    <SelectItem value="openrouter">
+                      {PROVIDER_LABEL.openrouter}
+                    </SelectItem>
                     <SelectItem value="openai_compatible">
                       {t('providerOpenAiCompatible')}
                     </SelectItem>
@@ -301,13 +388,54 @@ export function AiConfig() {
 
               <div className="space-y-2">
                 <Label htmlFor="ai-model">{t('model')}</Label>
-                <Input
-                  id="ai-model"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder={AI_PROVIDER_DEFAULT_MODEL[provider]}
-                  disabled={disabled}
-                />
+                {modelOptions ? (
+                  <>
+                    {modelOptions.length > MODEL_FILTER_THRESHOLD && (
+                      <Input
+                        value={modelFilter}
+                        onChange={(e) => setModelFilter(e.target.value)}
+                        placeholder={t('modelSearchPlaceholder')}
+                        disabled={disabled}
+                        autoComplete="off"
+                      />
+                    )}
+                    <Select
+                      value={model || null}
+                      onValueChange={(v) => setModel(typeof v === 'string' ? v : '')}
+                      disabled={disabled}
+                    >
+                      <SelectTrigger id="ai-model" className="w-full">
+                        <SelectValue placeholder={t('modelSelectPlaceholder')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {visibleModels.length === 0 ? (
+                          <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                            {t('modelsNoMatch')}
+                          </p>
+                        ) : (
+                          visibleModels.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.name === m.id ? m.id : `${m.name} (${m.id})`}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </>
+                ) : (
+                  <>
+                    <Input
+                      id="ai-model"
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      placeholder={AI_PROVIDER_DEFAULT_MODEL[provider]}
+                      disabled={disabled}
+                    />
+                    {canListModels(provider) && (
+                      <p className="text-xs text-muted-foreground">{t('modelsHint')}</p>
+                    )}
+                  </>
+                )}
               </div>
 
               {provider === 'openai_compatible' && (
@@ -337,6 +465,9 @@ export function AiConfig() {
                     onChange={(e) => {
                       setApiKey(e.target.value);
                       setKeyEdited(true);
+                      // A different key may see different models.
+                      setModels([]);
+                      setModelsProvider(null);
                     }}
                     onFocus={() => {
                       if (!keyEdited && hasStoredKey) {
@@ -374,6 +505,9 @@ export function AiConfig() {
                   {t('testKey')}
                 </Button>
               </div>
+              {provider === 'openrouter' && (
+                <p className="text-xs text-muted-foreground">{t('openRouterHint')}</p>
+              )}
             </div>
 
             <div className="space-y-2">

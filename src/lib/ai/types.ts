@@ -6,7 +6,25 @@
 // whether the account is on OpenAI or Anthropic.
 // ============================================================
 
-export type AiProvider = 'openai' | 'anthropic' | 'openai_compatible'
+export type AiProvider = 'openai' | 'anthropic' | 'openrouter' | 'openai_compatible'
+
+/** Every accepted provider id — single source for route-level validation. */
+export const AI_PROVIDERS: readonly AiProvider[] = [
+  'openai',
+  'anthropic',
+  'openrouter',
+  'openai_compatible',
+]
+
+export function isAiProvider(value: unknown): value is AiProvider {
+  return typeof value === 'string' && (AI_PROVIDERS as readonly string[]).includes(value)
+}
+
+/** One entry of a provider's model catalogue, as shown in the settings dropdown. */
+export interface AiModelOption {
+  id: string
+  name: string
+}
 
 /**
  * Account AI setup, decrypted and ready to use. Produced by
