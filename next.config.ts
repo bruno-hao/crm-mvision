@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
@@ -72,6 +73,22 @@ const nextConfig: NextConfig = {
     resolveAlias: {
       "@app-messages": `./messages/${APP_LOCALE}.json`,
     },
+  },
+  /**
+   * Production builds use webpack (`next build --webpack`), not Turbopack.
+   *
+   * Turbopack runs PostCSS/Tailwind in separate Node worker processes.
+   * On Hostinger's build container those workers die on startup
+   * ("node process exited before we could connect to it"), failing the
+   * build on the first CSS file (@xyflow/react/dist/style.css). Webpack
+   * runs PostCSS in-process, so mirror the Turbopack alias here.
+   */
+  webpack(config) {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@app-messages": path.join(process.cwd(), `messages/${APP_LOCALE}.json`),
+    };
+    return config;
   },
   // Emit a self-contained server bundle (.next/standalone) so the
   // Docker image can run without node_modules or the Next CLI.
