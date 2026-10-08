@@ -1974,7 +1974,14 @@
       "providerOpenAiCompatible": "OpenAI 호환 API",
       "baseUrl": "기본 URL",
       "baseUrlHint": "OpenAI 호환 API의 기본 URL입니다. 예: https://api.groq.com/openai/v1. /chat/completions 경로는 직접 입력하지 않는 경우 자동으로 추가됩니다.",
-      "missingBaseUrl": "OpenAI 호환 API의 기본 URL을 입력하세요."
+      "missingBaseUrl": "OpenAI 호환 API의 기본 URL을 입력하세요.",
+      "modelsLoaded": "키가 확인되었습니다 — 사용 가능한 모델 {count}개.",
+      "modelsFailed": "모델 목록을 불러오지 못했습니다.",
+      "modelSelectPlaceholder": "모델 선택",
+      "modelSearchPlaceholder": "모델 필터…",
+      "modelsNoMatch": "필터와 일치하는 모델이 없습니다.",
+      "modelsHint": "\"키 테스트\"를 눌러 키를 확인하고 사용 가능한 모델을 불러오세요.",
+      "openRouterHint": "OpenRouter 키(sk-or-...)를 사용하세요. openrouter.ai/keys에서 발급받을 수 있습니다."
     },
     "aiKnowledge": {
       "loadFailed": "지식베이스를 불러오지 못했습니다",
@@ -2580,7 +2587,9 @@
       "pausedRequired": "paused(불리언)는 필수입니다",
       "updateConversationFailed": "대화를 업데이트하지 못했습니다",
       "loadConfigFailed": "AI 설정을 불러오지 못했습니다",
-      "providerInvalid": "제공자는 \"openai\", \"anthropic\" 또는 \"openai_compatible\"이어야 합니다",
+      "providerInvalid": "제공자는 \"openai\", \"anthropic\", \"openrouter\" 또는 \"openai_compatible\"이어야 합니다",
+      "modelsUnsupported": "OpenAI 호환 API는 모델 목록을 지원하지 않습니다 — 모델 ID를 직접 입력하세요.",
+      "modelsFailed": "공급자에서 모델 목록을 불러오지 못했습니다.",
       "baseUrlRequired": "openai_compatible에는 base_url이 필수입니다",
       "baseUrlInvalid": "base_url은 올바른 http(s) URL이어야 합니다",
       "modelRequired": "모델은 필수입니다",
